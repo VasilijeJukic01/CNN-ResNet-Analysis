@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from gradcam import compute_gradcam
 
 from data_preparation import prepare_data, plot_distribution, show_images
-from main.models import ResNet, ResidualBlock, Bottleneck
+from main.models import ResNet, ResidualBlock, Bottleneck, SimpleCNN
 
 # Config
 EPOCHS = 10
@@ -54,8 +54,9 @@ def evaluate_accuracy(model, data_loader, device):
     return correct_predictions / total_predictions
 
 
-def plot_losses(losses_18, losses_34, losses_50):
+def plot_losses(losses_cnn, losses_18, losses_34, losses_50):
     plt.figure(figsize=(10, 5))
+    plt.plot(losses_cnn, color='purple', label='Simple CNN')
     plt.plot(losses_18, color='blue', label='ResNet-18')
     plt.plot(losses_34, color='red', label='ResNet-34')
     plt.plot(losses_50, color='green', label='ResNet-50')
@@ -78,7 +79,7 @@ def show_gradcam_images(model, loader, class_idx, device, title):
                 plt.subplot(10, 10, image_count + 1)
                 plt.axis('off')
                 plt.imshow(image[0].cpu().numpy().transpose(1, 2, 0), cmap='gray')
-                plt.imshow(cam, cmap='hot', alpha=0.5)
+                plt.imshow(cam, cmap='viridis', alpha=0.5)
                 image_count += 1
                 if image_count >= 100:
                     break
@@ -96,6 +97,7 @@ def main():
     show_images(train_loader, 'Training Images')
     show_images(test_loader, 'Test Images')
 
+    model_cnn = SimpleCNN()
     model_18 = ResNet(ResidualBlock, [2, 2, 2, 2])
     model_34 = ResNet(ResidualBlock, [3, 4, 6, 3])
     model_50 = ResNet(Bottleneck, [3, 4, 6, 3], model_name='ResNet-50')
@@ -105,7 +107,10 @@ def main():
     model_18 = model_18.to(device)
     model_34 = model_34.to(device)
     model_50 = model_50.to(device)
+    model_cnn = model_cnn.to(device)
 
+    print("Training Simple CNN")
+    losses_cnn = train_model(model_cnn, train_loader, device)
     print("Training ResNet-18")
     losses_18 = train_model(model_18, train_loader, device)
     print("Training ResNet-34")
@@ -113,21 +118,21 @@ def main():
     print("Training ResNet-50")
     losses_50 = train_model(model_50, train_loader, device)
 
-    plot_losses(losses_18, losses_34, losses_50)
+    plot_losses(losses_cnn, losses_18, losses_34, losses_50)
 
+    test_accuracy_cnn = evaluate_accuracy(model_cnn, test_loader, device)
     test_accuracy_18 = evaluate_accuracy(model_18, test_loader, device)
     test_accuracy_34 = evaluate_accuracy(model_34, test_loader, device)
     test_accuracy_50 = evaluate_accuracy(model_50, test_loader, device)
 
+    print(f'Test Accuracy Simple CNN: {test_accuracy_cnn * 100}%')
     print(f'Test Accuracy ResNet-18: {test_accuracy_18 * 100}%')
     print(f'Test Accuracy ResNet-34: {test_accuracy_34 * 100}%')
     print(f'Test Accuracy ResNet-50: {test_accuracy_50 * 100}%')
 
+    show_gradcam_images(model_18, test_loader, 0, device, 'Grad-CAM Class 0')
+    show_gradcam_images(model_34, test_loader, 0, device, 'Grad-CAM Class 0')
     show_gradcam_images(model_50, test_loader, 0, device, 'Grad-CAM Class 0')
-    show_gradcam_images(model_50, test_loader, 1, device, 'Grad-CAM Class 1')
-    show_gradcam_images(model_50, test_loader, 2, device, 'Grad-CAM Class 2')
-    show_gradcam_images(model_50, test_loader, 3, device, 'Grad-CAM Class 3')
-    show_gradcam_images(model_50, test_loader, 4, device, 'Grad-CAM Class 4')
 
 
 if __name__ == '__main__':
